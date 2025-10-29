@@ -1,0 +1,19 @@
+Your goal is to judge whether this email is actionable —that is, whether it expects a human reply.
+
+Use the metadata and content provided below. 
+If earlier messages are shown, treat them as context for understanding tone or closure.
+
+Email details:
+From: {from_}
+To: {to}
+Subject: {subject}
+Date: {date}
+Labels: {labels}
+
+Message content:
+{body}
+
+Prior correspondence (if available):
+{previous_emails}
+
+Reply only with the required system specified JSON object.

@@ -1,0 +1,19 @@
+Determine if this email requires a human reply.
+
+Consider both the message text and metadata (subject, sender, labels, headers). 
+If earlier exchanges are provided, use them only to understand the context (e.g., whether the message concludes a conversation or opens a new request).
+
+Metadata:
+From: {from_}
+To: {to}
+Subject: {subject}
+Date: {date}
+Labels: {labels}
+
+Body:
+{body}
+
+Earlier thread messages (if any):
+{previous_emails}
+
+Respond only with the JSON object described in your system instructions.
