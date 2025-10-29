@@ -84,7 +84,6 @@ def llm_needs_reply_judge(k: int, thread_bundle: dict, conf_thresh: float = 0.7)
 
     details = list()     
     for tmpl in _deterministic_variants(thread_bundle["latest"]["threadId"], k, max_num_judges):
-        print(thread_bundle["latest"])
         prompt = tmpl.format(
             from_=thread_bundle["latest"].get("from",""),
             to=thread_bundle["latest"].get("to",""),
