@@ -1,0 +1,4 @@
+max_threads: 3 #Last N threads from inbox
+backend_provider: openai #valid options openai, anthropic - anthropic currently untested (not fully supported)
+model_name:  gpt-5-nano-2025-08-07 #any model in either openai (e.g., gpt-5-nano-2025-08-07; gpt-4.1-nano-2025-04-14) or anthropic (e.g., claude-sonnet-4-5)
+num_judges: 5 #Number of LLM judges to use for response classification for those that pass rules (Max: 5)
