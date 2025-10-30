@@ -5,6 +5,7 @@ for needing a reply.
 
 import time 
 import hashlib
+import importlib.resources as resources
 import random
 from pathlib import Path
 import os
@@ -12,14 +13,16 @@ import json
 from typing import Dict, List
 from .models import get_llm
 
-SYSTEM = Path("prompts/needs_reply/system.txt").read_text()
-
-def _load_user_variants() -> List[str]:
-    # Read only user_*.txt, sorted for stability
-    files = sorted(Path("prompts/needs_reply").glob("user_*.txt"))
-    return [p.read_text() for p in files]
-
-USER_VARIANTS = _load_user_variants()
+CLASSIFIER_PROMPT_ROOT = resources.files("agent_mail") / "prompts" / "needs_reply" 
+SYSTEM = (CLASSIFIER_PROMPT_ROOT /  "system.txt").read_text(encoding="utf-8")  
+USER_VARIANTS = sorted(
+    (
+        p for p in CLASSIFIER_PROMPT_ROOT.iterdir()
+        if p.is_file() and p.name.startswith("user_") and p.suffix == ".txt"
+    ),
+    key=lambda x: x.name
+)
+USER_VARIANTS = [p.read_text(encoding="utf-8") for p in USER_VARIANTS]
 
 def no_reply_rules(last_email_meta: dict) -> bool:
     """Rules for no-reply
