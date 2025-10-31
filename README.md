@@ -1,7 +1,6 @@
 # 🕶️ Agent-Smith: The Fastino Gmail Reply Agent
 
-**Agent-Smith** is an experimental, LLM-powered Gmail reply agent that automates and personalizes your email workflow.  
-It identifies which emails need responses, generates draft replies with transparent bullet-point reasoning, and learns from your feedback to refine tone, style, and decision-making over time.  
+**Agent-Smith** is an experimental, LLM-powered Gmail reply agent that automates and personalizes your email workflow.  It identifies which emails need responses, generates draft replies with transparent bullet-point reasoning, and learns from your feedback to refine tone, style, and decision-making over time.  
 
 ---
 
@@ -57,7 +56,7 @@ You can customize **Agent-Smith** by editing the `agent_config.yaml` file.
 | `embedding_model` | Embedding model for style and context retrieval. | `text-embedding-3-small` |
 
 > 💡 **Tip:**  
-> `gpt-4.1-nano` is **faster and cheaper**, while `gpt-5-nano` provides **better reasoning quality** at higher token cost.
+> `gpt-4.1-nano` is **faster and cheaper**, while `gpt-5-nano` provides **better reasoning quality** at higher token cost (and is slower).
 
 ---
 
@@ -109,9 +108,9 @@ agent-smith show-memories
 
 ## 🧭 Roadmap
 
-- [ ] Add multi-account support  
 - [ ] Expand backend providers (Anthropic, Gemini, etc.)  
-- [ ] Enable continuous background mode with periodic polling  
+- [ ] Infer user feedback directly from gmail drafts (as opposed to per draft now)
+- [ ] Enable continuous background mode  
 
 ---
 
