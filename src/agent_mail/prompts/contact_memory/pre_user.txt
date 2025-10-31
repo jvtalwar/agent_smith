@@ -1,0 +1,8 @@
+Here is the most recent email we received from this contact:
+
+---
+{latest_inbound_body}
+---
+
+Infer this contact's persona, role, and any clear communication preferences.
+Return the JSON object as specified.

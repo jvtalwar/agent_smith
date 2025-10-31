@@ -1,0 +1,36 @@
+Below is the model-generated draft:
+
+---
+{model_generated_text}
+---
+
+Below is the user’s final edited version that was actually sent:
+
+---
+{user_final_text}
+---
+
+Here are the existing stored style edit summaries for this style profile:
+{example_user_edits_list}
+
+Compare the model draft and the final version.
+Describe ONLY how the user changed:
+- greeting / opening
+- tone or formality
+- structure (e.g. added apology first, shortened, added bullets)
+- signoff / closing phrase
+- signature block style (e.g. first name vs full name, added role line)
+
+Do NOT include:
+- phone numbers
+- email addresses
+- URLs / calendar links
+- dollar amounts
+- internal project or company code names
+
+Produce 1–3 NEW short summaries (≤ 25 words each) that capture any *new* style behaviors not already in the stored edit summaries.
+
+Return ONLY this JSON object:
+{
+  "new_example_user_edits": ["...", "..."]
+}

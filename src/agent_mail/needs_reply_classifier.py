@@ -61,7 +61,6 @@ def no_reply_rules(last_email_meta: dict) -> bool:
 
     return False 
 
-
 def _deterministic_variants(thread_id: str, k: int, max_num_judges: int) -> List[str]:
     '''Vary the user prompt passed to each judge as a f(x) of thread_id 
        (helpful for using models for which temperature cannot be varied)'''

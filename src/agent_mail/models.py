@@ -14,7 +14,7 @@ class OpenAILLM:
         self.client = OpenAI(api_key=api_key)
         self.model = model
 
-    def generate(self, prompt: str, *, system=None, max_tokens=500, temperature=0.2, as_json: bool = False) -> LLMResponse:
+    def generate(self, prompt: str, *, system=5000, max_tokens=None, temperature=0.2, as_json: bool = False) -> LLMResponse:
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
@@ -45,7 +45,7 @@ class AnthropicLLM:
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
 
-    def generate(self, prompt: str, *, system=None, max_tokens=500, temperature=0.2, as_json: bool = False) -> LLMResponse:
+    def generate(self, prompt: str, *, system=None, max_tokens=5000, temperature=0.2, as_json: bool = False) -> LLMResponse:
         params = params = {
             "model": self.model,
             "system": system or "",

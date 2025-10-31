@@ -32,6 +32,7 @@ class Settings(BaseSettings):
 
     backend_provider: str = "openai" 
     model_name: str = "gpt-5-nano-2025-08-07" 
+    embedding_model: str = "text-embedding-3-small"
     num_judges: int = 3
 
     model_config = SettingsConfigDict(

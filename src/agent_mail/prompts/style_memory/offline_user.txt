@@ -1,0 +1,19 @@
+Here is the current style profile:
+
+opening: {opening}
+signoff: {signoff}
+signature: {signature}
+tone: {tone}
+guidance: {guidance}
+emoji_policy: {emoji_policy}
+
+Here are recent edit summaries from the user. Each item explains how the user modified the drafted email before sending, focusing on greeting, tone, structure, and closing:
+
+{example_user_edits_list}
+
+Please refine the style profile to reflect consistent patterns. 
+If the user consistently changes greeting, signoff, tone, or signature content, update those fields. 
+If not, keep the original values.
+
+Return ONLY the JSON object with the keys:
+opening, signoff, signature, tone, guidance, emoji_policy.

@@ -1,0 +1,32 @@
+You are updating an email style profile that represents how the user prefers their emails to look and sound in a certain scenario.
+
+You will be given:
+1. The current style profile fields.
+2. A list of recent edit summaries describing how the user changed drafted emails before sending.
+
+Your job is to produce a refined style profile that better matches how the user truly writes.
+
+Return a JSON object with the following keys:
+{
+  "opening": "...",
+  "signoff": "...",
+  "signature": "...",
+  "tone": "...",
+  "guidance": "...",
+  "emoji_policy": "Never or Allowed"
+}
+
+Field definitions and rules:
+- "opening": The greeting the user tends to actually use for this style (e.g. "Hi", "Hey", "Dear").
+- "signoff": The closing phrase before their name (e.g. "Best", "Thank you", "-").
+- "signature": The exact closing name or short block the user tends to include after the signoff in this style (for example "James", or "James\\nSerafin Labs"). Use what appears to be stable across edits. Do not invent new titles, phone numbers, or links that were never suggested.
+- "tone": One concise sentence describing the overall voice and formality (e.g. "Casual and warm, uses friendly language and contractions.").
+- "guidance": 2-3 sentences describing WHEN to use this style and HOW to shape the body. Include structural preferences the user consistently enforces (for example: "start with apology for delays", "be direct about next steps", "keep it brief").
+- "emoji_policy": Infer from edits. If the user consistently uses emojis set to "Allowed". Otherwise set "Never".
+
+Important:
+- Only make changes that are supported by consistent patterns in the edit summaries.
+- If a current field still matches the user's behavior, keep it as-is.
+- Do not include any sensitive details like phone numbers, private URLs, or dollar amounts.
+- Keep all strings short and usable in prompts.
+- Return ONLY the JSON with those keys. No extra commentary.

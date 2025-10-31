@@ -1,0 +1,15 @@
+Previous summary:
+{prev_summary}
+
+Previous open_actions:
+{prev_open_actions}
+
+Most recent messages in this thread (newest last):
+[Message -2, older message if available]
+{prev_msg_text}
+
+[Message -1, latest message]:
+{latest_inbound_body}
+
+Update the summary and open_actions.
+Return strict JSON.
