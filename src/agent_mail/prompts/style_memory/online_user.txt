@@ -30,7 +30,4 @@ Do NOT include:
 
 Produce 1–3 NEW short summaries (≤ 25 words each) that capture any *new* style behaviors not already in the stored edit summaries.
 
-Return ONLY this JSON object:
-{
-  "new_example_user_edits": ["...", "..."]
-}
+Return ONLY the JSON object specified.

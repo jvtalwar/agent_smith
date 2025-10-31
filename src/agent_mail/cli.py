@@ -1,21 +1,24 @@
 import typer
 import os
+import time
+import json
 import subprocess
 import tempfile
+import copy
 from rich import print
 from rich.panel import Panel
 from rich.console import Console
 from .gmail_api import client, list_thread_ids, get_thread_summary, create_reply_draft, get_thread_bundle, get_user_identity
 from .needs_reply_classifier import no_reply_rules, llm_needs_reply_judge
 from .models import get_llm
-from .memories import initialize_style_memory, initialize_contact_memory, initialize_thread_memory, initialize_outcome_memory
+from .memories import initialize_style_memory, initialize_contact_memory, initialize_thread_memory, initialize_outcome_memory, _load_or_create_memory
 from .settings import settings
 from .utils import _get_openai_embedding, _calc_dot_product
-from .email_agent import pre_update_thread_memory, pre_update_contact_memory, extract_email_style_profile, generate_email_draft
+from .email_agent import pre_update_thread_memory, pre_update_contact_memory, extract_email_style_profile, generate_email_draft, post_update_style_memory, post_update_contact_memory, _save_memory_to_disk, offline_update_style_memory, offline_decay_contact_memory, offline_decay_thread_memory
 
 console = Console()
 
-app = typer.Typer(help="Gmail agent demo CLI")
+app = typer.Typer(help="Agent Smith: Your CLI Gmail agent")
 
 @app.command("list")
 def get_threads(prior: int = 2):
@@ -133,6 +136,23 @@ def test_style_match(tid: str, prior: int = 2):
     print(f"LOGS: {log_info}")
 
 
+def _save_outcome_memory(outcome_memory, outcome, filename= "outcome_memory.jsonl"):
+    # Append to deque (automatically drops oldest if at maxlen)
+    outcome_memory.appendleft(outcome)
+
+    # Convert to list sorted by timestamp descending (newest first)
+    sorted_records = sorted(list(outcome_memory), key=lambda e: e["last_updated_ts"], reverse=True)
+
+    # Persist to file
+    memories_dir = "memories"
+    os.makedirs(memories_dir, exist_ok=True)
+    filepath = os.path.join(memories_dir, filename)
+    
+    with open(filepath, "w") as f:
+        for record in sorted_records:
+            f.write(json.dumps(record) + "\n")
+
+
 @app.command("draft")
 def draft_email(tid: str, prior: int = 2): #replace tid with a full list of tids later after testing; pass in display name and model here as well 
     print(f"Drafting an email for thread {tid}...\n")
@@ -234,13 +254,254 @@ def draft_email(tid: str, prior: int = 2): #replace tid with a full list of tids
     elif user_decision == 'r':
         console.print("[yellow]Draft rejected. No changes made to Gmail.[/yellow]")
     
+
+    outcome = {"thread_id": gmail_bundle["thread_id"],
+               "contact_email": gmail_bundle["latest"]["from"],
+               "style_profile_used": query_style_log["style_name"],
+               "status": user_decision,  
+               "model_draft": email_draft,
+               "user_final_text": user_final_text,
+               "last_updated_ts": int(time.time())}
+
+    # Update contact and style memory based on user decision
+    print(f"\nONLINE CONSOLIDATION AND UPDATING MEMORIES...")
+    
+    # Update style memory (always, based on user decision) and save
+    style_update_log = post_update_style_memory(
+        model=model,
+        style_memory=style_memory,
+        style_profile_name=query_style_log["style_name"],
+        user_decision=user_decision,
+        model_draft=email_draft,
+        user_final_text=user_final_text
+    )
+    
+    # Update contact memory only on edit
+    contact_update_log = {}
+    if user_decision == 'e':
+        contact_update_log = post_update_contact_memory(
+            model=model,
+            contact_memory=contact_memory,
+            contact_id=contact_id,
+            model_draft=email_draft,
+            user_final_text=user_final_text
+        )
+    
+    # Save contact memory to disk
+    _save_memory_to_disk(contact_memory, "contact_memory.json")
+    
+    #Save thread memory:
+    _save_memory_to_disk(thread_memory, "thread_memory.json")
+
+    #Save outcomes to outcome memory
+    _save_outcome_memory(outcome_memory, outcome)
+
+    #print(f"[green]✓ Memories updated and saved to disk.[/green]\n")
+
     # Print debug logs
     print(f"\n[dim]--- Debug Logs ---[/dim]")
-    print(f"EMAIL DRAFT LOGS: {email_draft_logs}")
-    print(f"THREAD LOGS: {pre_thread_mem_log}")
-    print(f"CONTACT LOGS: {pre_contact_mem_log}")
-    print(f"STYLE LOGS: {query_style_log}")
+    print(f"EMAIL DRAFT LOGS: {email_draft_logs}\n")
+    print(f"THREAD LOGS: {pre_thread_mem_log}\n")
+    print(f"CONTACT LOGS: {pre_contact_mem_log}\n")
+    print(f"STYLE LOGS: {query_style_log}\n")
+    print(f"STYLE UPDATE LOGS: {style_update_log}\n")
+    print(f"CONTACT UPDATE LOGS: {contact_update_log}\n")
 
+
+@app.command("run")
+def run_agent_smith(prior: int = 2):
+    n = settings.max_threads #set number of last N gmail threads
+    s = client()
+    ids = list_thread_ids(s, n) 
+    for tid in ids:
+        gmail_bundle = get_thread_bundle(s, tid, prior) 
+        rules_reply = no_reply_rules(gmail_bundle["latest"])
+
+    #For each of those N threads, run 
+
+@app.command("show-memories")
+def show_memories():
+    """Display all stored memories (style, contact, thread, outcome)."""
+    memories_dir = "memories"
+    
+    # Check if memories directory exists and has files
+    if not os.path.exists(memories_dir):
+        console.print("\n[yellow]No memories directory found.[/yellow]")
+        console.print("Memories will be created once you give the agent a trial run with the [bold]draft[/bold] command.\n")
+        return
+    
+    # Check if directory has any JSON/JSONL files
+    memory_files = [f for f in os.listdir(memories_dir) if f.endswith(('.json', '.jsonl'))]
+    if not memory_files:
+        console.print("\n[yellow]No memory files found.[/yellow]")
+        console.print("Memories will be created once you give the agent a trial run!\n")
+        return
+    
+    console.print("\n[bold cyan]═══════════════════════════════════════[/bold cyan]")
+    console.print("[bold cyan]        Agent Memory System[/bold cyan]")
+    console.print("[bold cyan]═══════════════════════════════════════[/bold cyan]\n")
+    
+    # Load and display Style Memory
+    style_memory = _load_or_create_memory('style_memory.json', None)
+    if style_memory:
+        console.print("[bold magenta]📝 STYLE MEMORY[/bold magenta]")
+        console.print("[dim]Writing style profiles learned from your communication patterns[/dim]\n")
+        
+        # Deep copy and remove embeddings
+        style_display = copy.deepcopy(style_memory)
+        for profile_name, profile_data in style_display.items():
+            if 'embedding' in profile_data:
+                profile_data['embedding'] = "[hidden - high dimensional vector]"
+        
+        console.print(Panel(
+            json.dumps(style_display, indent=2),
+            title="Style Profiles",
+            border_style="magenta"
+        ))
+        console.print()
+    
+    # Load and display Contact Memory
+    contact_memory = _load_or_create_memory('contact_memory.json', None)
+    if contact_memory:
+        console.print("[bold green]👥 CONTACT MEMORY[/bold green]")
+        console.print("[dim]Information about people you communicate with[/dim]\n")
+        
+        console.print(Panel(
+            json.dumps(contact_memory, indent=2),
+            title="Contact Profiles",
+            border_style="green"
+        ))
+        console.print()
+    
+    # Load and display Thread Memory
+    thread_memory = _load_or_create_memory('thread_memory.json', None)
+    if thread_memory:
+        console.print("[bold blue]💬 THREAD MEMORY[/bold blue]")
+        console.print("[dim]Context and summaries of email conversations[/dim]\n")
+        
+        console.print(Panel(
+            json.dumps(thread_memory, indent=2),
+            title="Thread Summaries",
+            border_style="blue"
+        ))
+        console.print()
+    
+    # Load and display Outcome Memory
+    outcome_memory = _load_or_create_memory('outcome_memory.jsonl', [])
+    if outcome_memory:
+        console.print("[bold yellow]📊 OUTCOME MEMORY[/bold yellow]")
+        console.print("[dim]History of draft generations and user feedback[/dim]\n")
+        
+        # Format outcome memory for display
+        outcome_display = []
+        for record in outcome_memory:
+            outcome_display.append({
+                "thread_id": record.get("thread_id"),
+                "contact": record.get("contact_email"),
+                "style_used": record.get("style_profile_used"),
+                "status": record.get("status"),
+                "timestamp": record.get("last_updated_ts")
+            })
+        
+        console.print(Panel(
+            json.dumps(outcome_display, indent=2),
+            title=f"Recent Outcomes (showing {len(outcome_display)} records)",
+            border_style="yellow"
+        ))
+        console.print()
+    
+    console.print("[dim]Tip: These memories improve the agent's performance over time.[/dim]\n")
+
+
+@app.command("consolidate")
+def consolidate_memories():
+    """Perform offline consolidation of all memories."""
+    memories_dir = "memories"
+    
+    # Check if memories directory exists and has files
+    if not os.path.exists(memories_dir):
+        console.print("\n[yellow]No memories to consolidate yet![/yellow]")
+        console.print("Try running [bold cyan]agent-mail draft <thread_id>[/bold cyan] first to give the agent some experience.")
+        console.print("After you've drafted some emails and given feedback, you can consolidate memories at your leisure.\n")
+        return
+    
+    # Check if directory has any JSON/JSONL files
+    memory_files = [f for f in os.listdir(memories_dir) if f.endswith(('.json', '.jsonl'))]
+    if not memory_files:
+        console.print("\n[yellow]No memories to consolidate yet![/yellow]")
+        console.print("Try running [bold cyan]agent-mail draft <thread_id>[/bold cyan] first to give the agent some experience.")
+        console.print("After you've drafted some emails and given feedback, you can consolidate memories at your leisure.\n")
+        return
+    
+    console.print("\n[bold cyan]═══════════════════════════════════════[/bold cyan]")
+    console.print("[bold cyan]   Offline Memory Consolidation[/bold cyan]")
+    console.print("[bold cyan]═══════════════════════════════════════[/bold cyan]\n")
+    
+    #Get display name
+    s = client()
+    user_name_dict = get_user_identity(s)
+    display_name = user_name_dict["display_name"]
+
+    # Load model
+    model = get_llm()
+    
+    # Load all memories
+    console.print("[dim]Loading memories...[/dim]\n")
+    style_memory = initialize_style_memory(display_name=display_name)  # Will load existing if available
+    contact_memory = initialize_contact_memory()
+    thread_memory = initialize_thread_memory()
+    
+    # 1. Update style memory using LLM
+    console.print("[bold magenta]📝 Consolidating Style Memory...[/bold magenta]")
+    style_logs = offline_update_style_memory(model, style_memory)
+    
+    if style_logs:
+        console.print(f"[green]✓ Updated {len(style_logs)} style profile(s)[/green]")
+        for profile_name in style_logs.keys():
+            console.print(f"  - {profile_name}")
+    else:
+        console.print("[dim]  No style profiles needed updating (no user edits accumulated)[/dim]")
+    console.print()
+    
+    # 2. Decay contact memory
+    console.print("[bold green]👥 Applying Time Decay to Contact Memory...[/bold green]")
+    contact_logs = offline_decay_contact_memory(contact_memory)
+    removed_contacts = contact_logs.get("removed", [])
+    
+    if removed_contacts:
+        console.print(f"[yellow]⚠ Removed {len(removed_contacts)} stale contact(s)[/yellow]")
+        for contact_id in removed_contacts[:5]:  # Show first 5
+            console.print(f"  - {contact_id}")
+        if len(removed_contacts) > 5:
+            console.print(f"  ... and {len(removed_contacts) - 5} more")
+    else:
+        console.print("[green]✓ All contacts still active[/green]")
+    console.print()
+    
+    # 3. Decay thread memory
+    console.print("[bold blue]💬 Applying Time Decay to Thread Memory...[/bold blue]")
+    thread_logs = offline_decay_thread_memory(thread_memory)
+    removed_threads = thread_logs.get("removed", [])
+    
+    if removed_threads:
+        console.print(f"[yellow]⚠ Removed {len(removed_threads)} stale thread(s)[/yellow]")
+        for thread_id in removed_threads[:5]:  # Show first 5
+            console.print(f"  - {thread_id}")
+        if len(removed_threads) > 5:
+            console.print(f"  ... and {len(removed_threads) - 5} more")
+    else:
+        console.print("[green]✓ All threads still active[/green]")
+    console.print()
+    
+    # Summary
+    console.print("[bold cyan]═══════════════════════════════════════[/bold cyan]")
+    console.print("[bold green]✓ Consolidation Complete![/bold green]")
+    console.print("[bold cyan]═══════════════════════════════════════[/bold cyan]")
+    console.print(f"\n[dim]Summary:[/dim]")
+    console.print(f"  • Style profiles updated: {len(style_logs)}")
+    console.print(f"  • Contacts removed: {len(removed_contacts)}")
+    console.print(f"  • Threads removed: {len(removed_threads)}")
+    console.print()
 
 
 if __name__ == "__main__":

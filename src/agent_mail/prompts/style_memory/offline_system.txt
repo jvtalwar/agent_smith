@@ -21,8 +21,8 @@ Field definitions and rules:
 - "signoff": The closing phrase before their name (e.g. "Best", "Thank you", "-").
 - "signature": The exact closing name or short block the user tends to include after the signoff in this style (for example "James", or "James\\nSerafin Labs"). Use what appears to be stable across edits. Do not invent new titles, phone numbers, or links that were never suggested.
 - "tone": One concise sentence describing the overall voice and formality (e.g. "Casual and warm, uses friendly language and contractions.").
-- "guidance": 2-3 sentences describing WHEN to use this style and HOW to shape the body. Include structural preferences the user consistently enforces (for example: "start with apology for delays", "be direct about next steps", "keep it brief").
-- "emoji_policy": Infer from edits. If the user consistently uses emojis set to "Allowed". Otherwise set "Never".
+- "guidance": A single string containing 2-3 sentences describing WHEN to use this style and HOW to shape the body. Include structural preferences the user consistently enforces (for example: "start with apology for delays", "be direct about next steps", "keep it brief").
+- "emoji_policy": Infer from edits. If the user uses emojis set to "Allowed". Otherwise set "Never".
 
 Important:
 - Only make changes that are supported by consistent patterns in the edit summaries.
