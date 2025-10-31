@@ -1,4 +1,4 @@
-# 🕶️ Agent-Smith: The Fastino Gmail Reply Agent
+# 🕶️ Agent-Smith: Your Gmail Reply Agent
 
 **Agent-Smith** is an experimental, LLM-powered Gmail reply agent that automates and personalizes your email workflow.  It identifies which emails need responses, generates draft replies with transparent bullet-point reasoning, and learns from your feedback to refine tone, style, and decision-making over time.  
 
