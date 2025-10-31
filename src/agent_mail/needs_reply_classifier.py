@@ -27,7 +27,7 @@ USER_VARIANTS = [p.read_text(encoding="utf-8") for p in USER_VARIANTS]
 def no_reply_rules(last_email_meta: dict) -> bool:
     """Rules for no-reply
     INPUT: Dictionary of last email meta information ('latest' keyword for a message bundle)
-    OUTPUT: False, Confidence score (0.05 allow for uncertainty)
+    OUTPUT: False
     """
     from_field = last_email_meta.get("from", "").lower()
     subj = last_email_meta.get("subject", "").lower()
@@ -97,7 +97,7 @@ def llm_needs_reply_judge(k: int, thread_bundle: dict, conf_thresh: float = 0.7)
         )
 
         start = time.perf_counter()
-        response = model.generate(prompt, system = SYSTEM, as_json = True, max_tokens = 3000) #reasoning tokens can use a lot of tokens; provide buffer 
+        response = model.generate(prompt, system = SYSTEM, as_json = True, max_tokens = 8000) #reasoning tokens can use a lot of tokens; provide buffer  
         latency = time.perf_counter() - start
 
         try:

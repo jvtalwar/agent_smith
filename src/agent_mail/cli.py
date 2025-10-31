@@ -153,38 +153,42 @@ def _save_outcome_memory(outcome_memory, outcome, filename= "outcome_memory.json
             f.write(json.dumps(record) + "\n")
 
 
-@app.command("draft")
-def draft_email(tid: str, prior: int = 2): #replace tid with a full list of tids later after testing; pass in display name and model here as well 
-    print(f"Drafting an email for thread {tid}...\n")
-    s = client()
-    user_name_dict = get_user_identity(s)
-    display_name = user_name_dict["display_name"] #this will be moved outside and passed back in later as an input to draft <--
-    model = get_llm()
+#@app.command("draft")
+def draft_email(s, model, memories, gmail_bundle, tid, display_name): #replace tid with a full list of tids later after testing; pass in display name and model here as well 
+    subject_email = gmail_bundle["latest"]["subject"]
+    console.print(f"[cyan]Drafting an email for Subject: {subject_email} (thread {tid})...[/cyan]\n")
+    
+    #s = client()
 
-    gmail_bundle = get_thread_bundle(s, tid, prior) 
+    #user_name_dict = get_user_identity(s)
+    #display_name = user_name_dict["display_name"] #this will be moved outside and passed back in later as an input to draft <--
+    
+    #model = get_llm()
+
+    #gmail_bundle = get_thread_bundle(s, tid, prior) 
 
     contact_id = gmail_bundle["latest"]["from"]
 
     #These will all be initialized once outside and passed in a dict of memories here later <--
-    style_memory = initialize_style_memory(display_name = display_name)
-    contact_memory = initialize_contact_memory()
-    thread_memory = initialize_thread_memory()
-    outcome_memory = initialize_outcome_memory() #deque
+    style_memory = memories["style_memory"]    #initialize_style_memory(display_name = display_name)
+    contact_memory = memories["contact_memory"]  #initialize_contact_memory()
+    thread_memory = memories["thread_memory"]   #initialize_thread_memory()
+    outcome_memory = memories["outcome_memory"]  #initialize_outcome_memory() #deque
 
     #Update all relevant information:
-    print(f"PRE-DRAFT: Updating thread memory...\n")
+    console.print(f"[magenta]PRE-DRAFT: Updating thread memory...[/magenta]\n")
     pre_thread_mem_log = pre_update_thread_memory(model, thread_memory, gmail_bundle)
 
-    print(f"PRE-DRAFT: Updating contact_memory...\n")
+    console.print(f"[blue]PRE-DRAFT: Updating contact_memory...[/blue]\n")
     pre_contact_mem_log = pre_update_contact_memory(model, contact_memory, gmail_bundle)
 
-    print(f"PRE_DRAFT: Extracting max semantic similarity style profile from style memory...\n")
+    console.print(f"[magenta]PRE-DRAFT: Extracting max semantic similarity style profile from style memory...[/magenta]\n")
     style_profile, query_style_log = extract_email_style_profile(model, style_memory, gmail_bundle)
 
     contact_profile = contact_memory[gmail_bundle["latest"]["from"]]
     thread_profile = thread_memory[gmail_bundle["thread_id"]]
 
-    print("DRAFTING EMAIL...")
+    console.print("[cyan]DRAFTING EMAIL...[/cyan]")
     email_draft, email_draft_logs = generate_email_draft(model, style_profile, contact_profile, thread_profile, display_name, gmail_bundle)
     
     # Display the generated email to the user
@@ -207,7 +211,7 @@ def draft_email(tid: str, prior: int = 2): #replace tid with a full list of tids
         if user_input in ['a', 'e', 'r']:
             user_decision = user_input
         else:
-            print("[red]Invalid input. Please enter A, E, or R.[/red]")
+            console.print("[red]Invalid input. Please enter A, E, or R.[/red]")
     
     user_final_text = ""
     
@@ -232,7 +236,7 @@ def draft_email(tid: str, prior: int = 2): #replace tid with a full list of tids
             with open(temp_path, 'r') as tf:
                 user_final_text = tf.read()
             
-            print("[green]Edit complete![/green]")
+            console.print("[green]Edit complete![/green]")
         finally:
             # Clean up the temporary file
             os.unlink(temp_path)
@@ -264,7 +268,7 @@ def draft_email(tid: str, prior: int = 2): #replace tid with a full list of tids
                "last_updated_ts": int(time.time())}
 
     # Update contact and style memory based on user decision
-    print(f"\nONLINE CONSOLIDATION AND UPDATING MEMORIES...")
+    console.print(f"\n[cyan]ONLINE CONSOLIDATION AND UPDATING MEMORIES...[/cyan]")
     
     # Update style memory (always, based on user decision) and save
     style_update_log = post_update_style_memory(
@@ -299,25 +303,95 @@ def draft_email(tid: str, prior: int = 2): #replace tid with a full list of tids
     #print(f"[green]✓ Memories updated and saved to disk.[/green]\n")
 
     # Print debug logs
-    print(f"\n[dim]--- Debug Logs ---[/dim]")
-    print(f"EMAIL DRAFT LOGS: {email_draft_logs}\n")
-    print(f"THREAD LOGS: {pre_thread_mem_log}\n")
-    print(f"CONTACT LOGS: {pre_contact_mem_log}\n")
-    print(f"STYLE LOGS: {query_style_log}\n")
-    print(f"STYLE UPDATE LOGS: {style_update_log}\n")
-    print(f"CONTACT UPDATE LOGS: {contact_update_log}\n")
+    #print(f"\n[dim]--- Debug Logs ---[/dim]")
+    #print(f"EMAIL DRAFT LOGS: {email_draft_logs}\n")
+    #print(f"THREAD LOGS: {pre_thread_mem_log}\n")
+    #print(f"CONTACT LOGS: {pre_contact_mem_log}\n")
+    #print(f"STYLE LOGS: {query_style_log}\n")
+    #print(f"STYLE UPDATE LOGS: {style_update_log}\n")
+    #print(f"CONTACT UPDATE LOGS: {contact_update_log}\n")
 
+    drafting_logs = {"PRE-EMAIL Thread Memory Update:": pre_thread_mem_log,
+                     "PRE-EMAIL Contact Memory Update:": pre_contact_mem_log, 
+                     "PRE-EMAIL Style Profile Semantic Similarity:": query_style_log,
+                     "EMAIL Draft:": email_draft_logs,
+                     "ONLINE CONSOLIDATION: Style Memory": style_update_log,
+                     "ONLINE CONSOLIDATION: Contact Memory": contact_update_log
+                    }
+
+    return drafting_logs
 
 @app.command("run")
-def run_agent_smith(prior: int = 2):
+def run_agent_smith(prior: int = 2, logging_tolerance: float = 0.15, llm_conf_thresh: float = 0.7):
+    """Run gmail reply agent. Identifies emails to reply to, generates drafts for those needing it, passes to user for feedback, creates drafts in gmail."""
     n = settings.max_threads #set number of last N gmail threads
     s = client()
+
+    user_name_dict = get_user_identity(s)
+    display_name = user_name_dict["display_name"]
+
     ids = list_thread_ids(s, n) 
+    
+    #load model and memories
+    model = get_llm()
+    style_memory = initialize_style_memory(display_name = display_name)
+    contact_memory = initialize_contact_memory()
+    thread_memory = initialize_thread_memory()
+    outcome_memory = initialize_outcome_memory()
+    memories = {"style_memory": style_memory,
+                "contact_memory": contact_memory,
+                "thread_memory": thread_memory,
+                "outcome_memory": outcome_memory
+                }
+
+    # Create logs directory
+    logs_dir = "logs"
+    os.makedirs(logs_dir, exist_ok=True)
+
+    candidates = {"rules_reject": [], "judge_reject": [], "judge_passed": []}
+
     for tid in ids:
         gmail_bundle = get_thread_bundle(s, tid, prior) 
+        subject_email = gmail_bundle["latest"]["subject"]
+
         rules_reply = no_reply_rules(gmail_bundle["latest"])
 
-    #For each of those N threads, run 
+        #confidence_score = 0.05 
+
+        if not rules_reply: #rules didn't catch an email - route to llm as judge
+            log_borderline = False
+            
+            judge_logs, confidence_score = llm_needs_reply_judge(k = settings.num_judges, thread_bundle = gmail_bundle)
+            timestamp = int(time.time()) #For ease of log check viewing ensure timestamp is same for judge and draft logs
+
+            if (llm_conf_thresh - logging_tolerance) <= confidence_score <= (llm_conf_thresh + logging_tolerance):
+                log_borderline = True
+                
+            if confidence_score >= llm_conf_thresh: #Draft email, present to user, and perform all necessary memory updates
+                candidates["judge_passed"].append((subject_email, tid, confidence_score))
+                drafting_email_logs = draft_email(s, model, memories, gmail_bundle, tid, display_name)
+                
+                # Write draft logs
+                draft_log_file = os.path.join(logs_dir, f"Email_Draft_{tid}_{timestamp}.log")
+                with open(draft_log_file, 'w') as f:
+                    json.dump(drafting_email_logs, f, indent=2)
+
+            else:
+                candidates["judge_reject"].append((subject_email, tid, confidence_score))
+            
+            # Write judge logs when borderline
+            if log_borderline:
+                #timestamp = int(time.time())
+                judge_log_file = os.path.join(logs_dir, f"LLM_Judge_{tid}_{timestamp}.log")
+                with open(judge_log_file, 'w') as f:
+                    json.dump(judge_logs, f, indent=2)
+
+        else:
+            candidates["rules_reject"].append((subject_email, tid))
+
+    results_log_file = os.path.join(logs_dir, f"Results_{int(time.time())}.log")
+    with open(results_log_file, 'w') as f:
+        json.dump(candidates, f, indent=2)
 
 @app.command("show-memories")
 def show_memories():
@@ -421,7 +495,7 @@ def consolidate_memories():
     # Check if memories directory exists and has files
     if not os.path.exists(memories_dir):
         console.print("\n[yellow]No memories to consolidate yet![/yellow]")
-        console.print("Try running [bold cyan]agent-mail draft <thread_id>[/bold cyan] first to give the agent some experience.")
+        console.print("Try running [bold cyan]agent-mail run[/bold cyan] first to give the agent some experience.")
         console.print("After you've drafted some emails and given feedback, you can consolidate memories at your leisure.\n")
         return
     
@@ -429,7 +503,7 @@ def consolidate_memories():
     memory_files = [f for f in os.listdir(memories_dir) if f.endswith(('.json', '.jsonl'))]
     if not memory_files:
         console.print("\n[yellow]No memories to consolidate yet![/yellow]")
-        console.print("Try running [bold cyan]agent-mail draft <thread_id>[/bold cyan] first to give the agent some experience.")
+        console.print("Try running [bold cyan]agent-mail run[/bold cyan] first to give the agent some experience.")
         console.print("After you've drafted some emails and given feedback, you can consolidate memories at your leisure.\n")
         return
     
