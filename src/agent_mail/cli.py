@@ -1,5 +1,10 @@
 import typer
+import os
+import subprocess
+import tempfile
 from rich import print
+from rich.panel import Panel
+from rich.console import Console
 from .gmail_api import client, list_thread_ids, get_thread_summary, create_reply_draft, get_thread_bundle, get_user_identity
 from .needs_reply_classifier import no_reply_rules, llm_needs_reply_judge
 from .models import get_llm
@@ -7,6 +12,8 @@ from .memories import initialize_style_memory, initialize_contact_memory, initia
 from .settings import settings
 from .utils import _get_openai_embedding, _calc_dot_product
 from .email_agent import pre_update_thread_memory, pre_update_contact_memory, extract_email_style_profile, generate_email_draft
+
+console = Console()
 
 app = typer.Typer(help="Gmail agent demo CLI")
 
@@ -142,6 +149,7 @@ def draft_email(tid: str, prior: int = 2): #replace tid with a full list of tids
     style_memory = initialize_style_memory(display_name = display_name)
     contact_memory = initialize_contact_memory()
     thread_memory = initialize_thread_memory()
+    outcome_memory = initialize_outcome_memory() #deque
 
     #Update all relevant information:
     print(f"PRE-DRAFT: Updating thread memory...\n")
@@ -159,9 +167,76 @@ def draft_email(tid: str, prior: int = 2): #replace tid with a full list of tids
     print("DRAFTING EMAIL...")
     email_draft, email_draft_logs = generate_email_draft(model, style_profile, contact_profile, thread_profile, display_name, gmail_bundle)
     
-    print(f"EMAIL: {email_draft}")
-    print(f"LOGS: {email_draft_logs}")
-
+    # Display the generated email to the user
+    subject = gmail_bundle["latest"]["subject"]
+    if subject and not subject.lower().startswith("re:"):
+        subject = f"Re: {subject}"
+    
+    console.print("\n" + "="*80)
+    console.print("[bold cyan]Generated Email Draft[/bold cyan]")
+    console.print("="*80)
+    console.print(f"[bold]Subject:[/bold] {subject}")
+    console.print("-"*80)
+    console.print(Panel(email_draft, title="Message Body", border_style="green"))
+    console.print("="*80 + "\n")
+    
+    # Prompt user for decision
+    user_decision = ""
+    while user_decision not in ['a', 'e', 'r']:
+        user_input = input("[A]pprove, [E]dit, or [R]eject? ").strip().lower()
+        if user_input in ['a', 'e', 'r']:
+            user_decision = user_input
+        else:
+            print("[red]Invalid input. Please enter A, E, or R.[/red]")
+    
+    user_final_text = ""
+    
+    # Handle Edit option
+    if user_decision == 'e':
+        # Create a temporary file with the draft
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as tf:
+            tf.write(email_draft)
+            temp_path = tf.name
+        
+        try:
+            # Determine which editor to use
+            editor = os.environ.get('EDITOR', 'nano')
+            # If editor env var doesn't exist or is empty, try nano, then vim
+            if not editor:
+                editor = 'nano'
+            
+            # Launch the editor
+            subprocess.call([editor, temp_path])
+            
+            # Read back the edited content
+            with open(temp_path, 'r') as tf:
+                user_final_text = tf.read()
+            
+            print("[green]Edit complete![/green]")
+        finally:
+            # Clean up the temporary file
+            os.unlink(temp_path)
+    
+    # Push draft to Gmail if approved or edited
+    if user_decision in ['a', 'e']:
+        body_text = email_draft if user_decision == 'a' else user_final_text
+        
+        # Create thread dict compatible with create_reply_draft
+        thread_dict = {
+            "thread_id": gmail_bundle["thread_id"],
+            "subject": gmail_bundle["latest"]["subject"],
+            "from": gmail_bundle["latest"]["from"],
+            "message_id": gmail_bundle["latest"]["message_id"]
+        }
+        
+        draft_id = create_reply_draft(s, thread_dict, body_text)
+        console.print(f"[bold green]✓ Draft created successfully![/bold green] Draft ID: {draft_id}")
+    elif user_decision == 'r':
+        console.print("[yellow]Draft rejected. No changes made to Gmail.[/yellow]")
+    
+    # Print debug logs
+    print(f"\n[dim]--- Debug Logs ---[/dim]")
+    print(f"EMAIL DRAFT LOGS: {email_draft_logs}")
     print(f"THREAD LOGS: {pre_thread_mem_log}")
     print(f"CONTACT LOGS: {pre_contact_mem_log}")
     print(f"STYLE LOGS: {query_style_log}")

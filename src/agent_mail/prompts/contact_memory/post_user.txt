@@ -1,0 +1,24 @@
+The model previously generated this draft:
+---
+{model_generated_email}
+---
+
+The user edited it into this final version before sending:
+---
+{user_edited_email}
+---
+
+Here is the current contact memory entry:
+---
+Persona: {contact_persona}
+Role: {contact_role}
+Preferences: {contact_preferences}
+---
+
+Compare the model’s version and the user’s edits.
+Determine what these edits imply about the contact’s personality, expectations, or communication style.
+
+Update persona and role if you see a better fit.
+Add new, non-redundant preference strings reflecting the observed changes.
+
+Return ONLY valid JSON as specified.
