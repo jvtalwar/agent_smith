@@ -1,0 +1,48 @@
+You are replying to this email thread.
+
+Email to which we are replying (the most recent inbound message from the other person):
+---
+{latest_inbound_text}
+---
+
+Prior messages in this thread (if available; oldest -> latest, may be truncated for brevity):
+{previous_messages}
+
+Thread summary (for your internal context only):
+{thread_summary}
+
+Outstanding actions the user may owe (for internal context only):
+{open_actions}
+
+Sender contact information (for internal context only):
+From: {contact_from}
+Persona: {contact_persona}
+Role: {contact_role}
+Known preferences: {contact_preferences}
+
+Selected style profile:
+Opening: {style_opening}
+Signoff: {style_signoff}
+Signature: {style_signature}
+Tone: {style_tone}
+Guidance: {style_guidance}
+Emoji policy: {emoji_policy}
+
+The known user name is: {user_name}.
+Rules for closing:
+- If Signature is not "", always end the draft with:
+  {style_signoff}
+  {style_signature}
+- If style Signature is "" and user_name is "":
+  end the draft with just {style_signoff} and NO name.
+- Do not invent or guess a name.
+
+Your job:
+1. Write a polite, context-aware reply to the inbound message that addresses any outstanding actions if appropriate.
+2. Match the provided tone, opening, signoff, and style guidance.
+3. Keep it concise (~120 words unless clearly necessary).
+
+Return ONLY valid JSON with these keys:
+- "email_draft": the final reply body (ready to send to the recipient, including greeting, body, and closing)
+- "reasoning_bullets": a list of short bullet-point style explanations of why you wrote it that way (2–5 items, each under one line). These bullets are for internal logging only and MUST NOT appear in the email_draft.
+

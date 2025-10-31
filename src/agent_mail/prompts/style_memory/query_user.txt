@@ -6,7 +6,4 @@ Here is the inbound email the user received:
 
 Describe the tone, formality, and emotional intent that the *reply* should match or mirror.
 
-Return the JSON object:
-{
-  "style_query": "..."
-}
+Return the JSON object as specified in system.

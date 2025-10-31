@@ -60,7 +60,7 @@ def update_style_embeddings(style_memory):
         embedding = _get_openai_embedding(concat_text)
         profile["embedding"] = embedding
 
-def initialize_style_memory(email_from: str):
+def initialize_style_memory(display_name: str):
     '''Initialize/Define a style memory; this is used for cold-start
        and will be updated as the agent gets feedback'''
     
@@ -69,7 +69,7 @@ def initialize_style_memory(email_from: str):
     if existing_memory not in (None, {}):
         return existing_memory
 
-    ind_name = email_from.split("<")[0].strip()
+    ind_name = display_name.strip()
     current_time = int(time.time())
 
     style_profiles = {

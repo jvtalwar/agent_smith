@@ -1,12 +1,12 @@
 import typer
 from rich import print
-from .gmail_api import client, list_thread_ids, get_thread_summary, create_reply_draft, get_thread_bundle
+from .gmail_api import client, list_thread_ids, get_thread_summary, create_reply_draft, get_thread_bundle, get_user_identity
 from .needs_reply_classifier import no_reply_rules, llm_needs_reply_judge
 from .models import get_llm
 from .memories import initialize_style_memory, initialize_contact_memory, initialize_thread_memory, initialize_outcome_memory
 from .settings import settings
 from .utils import _get_openai_embedding, _calc_dot_product
-from .email_agent import pre_update_thread_memory, pre_update_contact_memory
+from .email_agent import pre_update_thread_memory, pre_update_contact_memory, extract_email_style_profile, generate_email_draft
 
 app = typer.Typer(help="Gmail agent demo CLI")
 
@@ -57,7 +57,10 @@ def test_llm_as_judge(tid: str, prior: int = 2):
 def test_style():
     test_query = "Replying to customer who is unhappy."
 
-    style_mem = initialize_style_memory("'Cursor Team <hi@mail.cursor.com>'")
+    s = client()
+    user_name_dict = get_user_identity(s)
+    print(user_name_dict)
+    style_mem = initialize_style_memory(user_name_dict["display_name"])
 
     print(f"STYLE MEM: {style_mem}")
 
@@ -84,7 +87,7 @@ def test_pre_thread_mem(tid: str, prior: int = 2):
     print(returned_dict)
 
 @app.command("test-pre-contact")
-def test_pre_thread_mem(tid: str, prior: int = 2):
+def test_pre_contact_mem(tid: str, prior: int = 2):
     s = client()
     th = get_thread_bundle(s, tid, prior)
 
@@ -105,6 +108,64 @@ def test_pre_thread_mem(tid: str, prior: int = 2):
     print(contact_memory)
 
     print(returned_dict)
+
+@app.command("test-style-match")
+def test_style_match(tid: str, prior: int = 2):
+    s = client()
+    th = get_thread_bundle(s, tid, prior)
+
+    model = get_llm()
+
+    style_memory = initialize_style_memory(display_name = th["latest"]["from"])
+
+    #print(f"INITIALIZED: {style_memory}")
+    
+    style_profile, log_info = extract_email_style_profile(model, style_memory, th)
+
+    print(f"STYLE: {style_profile}")
+    print(f"LOGS: {log_info}")
+
+
+@app.command("draft")
+def draft_email(tid: str, prior: int = 2): #replace tid with a full list of tids later after testing; pass in display name and model here as well 
+    print(f"Drafting an email for thread {tid}...\n")
+    s = client()
+    user_name_dict = get_user_identity(s)
+    display_name = user_name_dict["display_name"] #this will be moved outside and passed back in later as an input to draft <--
+    model = get_llm()
+
+    gmail_bundle = get_thread_bundle(s, tid, prior) 
+
+    contact_id = gmail_bundle["latest"]["from"]
+
+    #These will all be initialized once outside and passed in a dict of memories here later <--
+    style_memory = initialize_style_memory(display_name = display_name)
+    contact_memory = initialize_contact_memory()
+    thread_memory = initialize_thread_memory()
+
+    #Update all relevant information:
+    print(f"PRE-DRAFT: Updating thread memory...\n")
+    pre_thread_mem_log = pre_update_thread_memory(model, thread_memory, gmail_bundle)
+
+    print(f"PRE-DRAFT: Updating contact_memory...\n")
+    pre_contact_mem_log = pre_update_contact_memory(model, contact_memory, gmail_bundle)
+
+    print(f"PRE_DRAFT: Extracting max semantic similarity style profile from style memory...\n")
+    style_profile, query_style_log = extract_email_style_profile(model, style_memory, gmail_bundle)
+
+    contact_profile = contact_memory[gmail_bundle["latest"]["from"]]
+    thread_profile = thread_memory[gmail_bundle["thread_id"]]
+
+    print("DRAFTING EMAIL...")
+    email_draft, email_draft_logs = generate_email_draft(model, style_profile, contact_profile, thread_profile, display_name, gmail_bundle)
+    
+    print(f"EMAIL: {email_draft}")
+    print(f"LOGS: {email_draft_logs}")
+
+    print(f"THREAD LOGS: {pre_thread_mem_log}")
+    print(f"CONTACT LOGS: {pre_contact_mem_log}")
+    print(f"STYLE LOGS: {query_style_log}")
+
 
 
 if __name__ == "__main__":

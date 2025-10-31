@@ -13,6 +13,25 @@ META_HEADERS = [
     "From", "To", "Cc", "Date", "Subject", "Message-Id"
 ]
 
+#function to get user display name:
+def get_user_identity(service: Resource):
+    resp = service.users().settings().sendAs().list(userId="me").execute()
+    for entry in resp.get("sendAs", []):
+        if entry.get("isDefault"):
+            return {
+                "email": entry.get("sendAsEmail", ""),
+                "display_name": entry.get("displayName", "").strip()
+            }
+
+    # fallback: just take the first one
+    if resp.get("sendAs"):
+        entry = resp["sendAs"][0]
+        return {
+            "email": entry.get("sendAsEmail", ""),
+            "display_name": entry.get("displayName", "").strip()
+        }
+    return {"email": "", "display_name": ""}  # extreme fallback
+
 #Function to list the last N threads (from INBOX)
 def list_thread_ids(service: Resource, n: int | None = None) -> list[str]:
     n = n or settings.max_threads
